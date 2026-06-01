@@ -1,17 +1,17 @@
-# 项目总目标 (project_brief.md)
+# Project Goal (project_brief.md)
 
-> 回答"为什么做"。所有角色 Step 1 第二优先级读取。保持简短、稳定。
+> Answers "why we're doing this". Second-priority read in Step 1 for all roles. Keep it short and stable.
 
-## 一句话目标
-<在这里写本项目的核心目标。例如："构建一个能自动从论文复现实验的多 Agent 框架"。>
+## One-line Goal
+<Write the project's core goal here. E.g. "Build a multi-agent framework that auto-reproduces experiments from papers.">
 
-## 背景 / 动机
-<为什么要做这件事，要解决什么问题。>
+## Background / Motivation
+<Why this matters, what problem it solves.>
 
-## 成功标准
-- <可衡量的成功标准 1>
-- <可衡量的成功标准 2>
+## Success Criteria
+- <measurable success criterion 1>
+- <measurable success criterion 2>
 
-## 范围边界
-- 做：<在范围内的事>
-- 不做：<明确排除的事>
+## Scope Boundaries
+- In scope: <things in scope>
+- Out of scope: <things explicitly excluded>

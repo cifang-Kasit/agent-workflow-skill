@@ -1,21 +1,21 @@
-# 实现路径框架 (roadmap.md)
+# Implementation Framework (roadmap.md)
 
-> phase 级总框架，由 planner 维护。Step 1 第三优先级读取。
-> 这里只放"大阶段"，具体任务在 todos.md。
+> Phase-level overall framework, maintained by planner. Third-priority read in Step 1.
+> Keep only the "big phases" here; concrete tasks go in todos.md.
 
-## Phase 总览
+## Phase Overview
 
-| Phase | 目标 | 主要负责角色 | 状态 |
-|-------|------|------------|------|
-| phase 1 | <阶段目标> | executor / reviewer | 进行中 / 待开始 / 完成 |
-| phase 2 | <阶段目标> | ... | 待开始 |
+| Phase | Goal | Lead role(s) | Status |
+|-------|------|--------------|--------|
+| phase 1 | <phase goal> | executor / reviewer | in progress / not started / done |
+| phase 2 | <phase goal> | ... | not started |
 
-## Phase 详述
+## Phase Details
 
-### phase 1 — <名称>
-- **目标**：<这个阶段要达成什么>
-- **各角色职责**：
-  - planner：<规划什么>
-  - executor：<实现什么>
-  - reviewer：<验证什么>
-- **完成判据**：<达到什么算这个 phase 完成>
+### phase 1 — <name>
+- **Goal**: <what this phase aims to achieve>
+- **Per-role responsibilities**:
+  - planner: <what to plan>
+  - executor: <what to implement>
+  - reviewer: <what to verify>
+- **Done criteria**: <what counts as this phase complete>

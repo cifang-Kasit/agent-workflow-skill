@@ -1,301 +1,301 @@
-# 多 Agent 工作流协议
+# Multi-Agent Workflow Protocol
 
-> 本文件是项目级操作协议。Claude 每次对话自动读取并**严格遵守**。
-> 本协议把一个项目拆成多个 **Agent 角色**，每个角色有独立职责、记忆与产出。
-> 所有文件都是**本地文件**，直接用 Read / Write / Edit 工具操作，无需 SSH。
+> This file is a project-level operating protocol. Claude reads it automatically every conversation and **follows it strictly**.
+> This protocol splits a project into multiple **Agent roles**, each with its own responsibilities, memory, and outputs.
+> All files are **local files** — operate on them directly with the Read / Write / Edit tools. No SSH required.
 
 ---
 
-## 目录结构
+## Directory Layout
 
 ```
-<项目根>/
-├── CLAUDE.md                      # 本协议（自动生效）
+<project-root>/
+├── CLAUDE.md                      # This protocol (auto-applied)
 └── .workflow/
-    ├── shared/                    # 全局共享状态
-    │   ├── project_brief.md       # 项目总目标（为什么做）
-    │   ├── roadmap.md             # phase 级框架（planner 维护）
-    │   ├── todos.md               # 分解后的具体任务（planner 维护）
-    │   ├── blockers.md            # 阻塞器清单（事件驱动）
-    │   └── activity_log.md        # 全局活动日志（所有 agent 追加）
+    ├── shared/                    # Global shared state
+    │   ├── project_brief.md       # Overall goal (the "why")
+    │   ├── roadmap.md             # Phase-level framework (maintained by planner)
+    │   ├── todos.md               # Decomposed concrete tasks (maintained by planner)
+    │   ├── blockers.md            # Blocker list (event-driven)
+    │   └── activity_log.md        # Global activity log (every agent appends)
     └── agents/
         └── <agent_name>/
-            ├── ROLE.md            # 该角色的行为契约
-            ├── MEMORY.md          # 该角色的交互记忆
-            ├── notes/             # 该角色沉淀的 note（按 phase 分目录）
-            └── .turns_since_memory# 距上次写 MEMORY 的副作用 turn 计数
+            ├── ROLE.md            # Behavior contract for this role
+            ├── MEMORY.md          # Interaction memory for this role
+            ├── notes/             # Notes produced by this role (by phase)
+            └── .turns_since_memory# Side-effect turn count since last MEMORY write
 ```
 
-> 路径变量：下文用 `<root>` 表示项目根，`<agent>` 表示当前角色名。
+> Path variables: below, `<root>` = project root, `<agent>` = current role name.
 
 ---
 
-## 内置通用角色（可自定义/扩展）
+## Built-in Generic Roles (customizable / extensible)
 
-| Agent | 职责 | 是否 Note Producer |
-|-------|------|--------------------|
-| `main` | 主协调者：任务委派、进度跟踪、维护 activity_log 与 blockers | 否 |
-| `planner` | 规划：维护 roadmap / todos，唯一拥有 todos 打钩权 | 否 |
-| `executor` | 执行：实现、产出、构建 | **是** |
-| `reviewer` | 审查 / 测试：验证质量、报告问题 | **是** |
+| Agent | Responsibility | Note Producer? |
+|-------|----------------|----------------|
+| `main` | Coordinator: task delegation, progress tracking, maintains activity_log & blockers | No |
+| `planner` | Planning: maintains roadmap / todos; the only role allowed to check off todos | No |
+| `executor` | Execution: implement, produce, build | **Yes** |
+| `reviewer` | Review / test: verify quality, report issues | **Yes** |
 
-> **自定义角色**：在 `.workflow/agents/<新名字>/` 下放一份 `ROLE.md` 即可（可用 `/agent-workflow add-agent <名字>` 生成）。
-> 例：科研项目可加 `research` / `data_analysis` / `writing`；产品项目可加 `designer` / `qa`。
-> 谁是 Note Producer 由各自 ROLE.md 声明。
-
----
-
-## Agent 身份指定（强制规则）
-
-> **每条用户消息都必须包含 Agent 身份指定（如"你是 executor"）。**
-> **若用户消息未指定任何 Agent 身份，必须立即提醒：**
-> "请先指定我扮演哪个 Agent（main / planner / executor / reviewer / <自定义>）"
-> **不要猜测、不要沿用上一次身份、不要直接开始工作。等用户明确指定后再行动。**
+> **Custom roles**: drop a `ROLE.md` into `.workflow/agents/<new-name>/` (use `/agent-workflow add-agent <name>`).
+> E.g. research projects may add `research` / `data_analysis` / `writing`; product projects may add `designer` / `qa`.
+> Whether a role is a Note Producer is declared in its own ROLE.md.
 
 ---
 
-## 调用方式（强制执行）
+## Agent Identity Designation (mandatory rule)
 
-> 当用户说"你是 XX agent"（不含 "ask"）时，必须**按顺序**完成以下步骤，再做任何其他事。不可跳过。
+> **Every user message must include an Agent identity (e.g. "you are executor").**
+> **If a user message specifies no Agent identity, immediately prompt:**
+> "Please first specify which Agent I should act as (main / planner / executor / reviewer / <custom>)."
+> **Do not guess, do not reuse the previous identity, do not start working. Wait until the user explicitly specifies.**
 
-### Step 1 — 读取核心文件（按优先级降序，并行读取）
+---
 
-| # | 文件 | 优先级 | 含义 |
-|---|------|--------|------|
-| 1 | `<root>/.workflow/agents/<agent>/ROLE.md` | 最高 | 我**应该**做什么（行为契约） |
-| 2 | `<root>/.workflow/shared/project_brief.md` | 第二 | 项目**总目标**（为什么做） |
-| 3 | `<root>/.workflow/shared/roadmap.md` | 第三 | 实现路径**总框架**（phase 级） |
-| 4 | `<root>/.workflow/shared/todos.md` | 第四 | 分解后的**具体任务** |
-| 5 | `<root>/.workflow/shared/blockers.md` | 第五 | **未规划补丁**（卡在哪、谁负责） |
-| 6 | `<root>/.workflow/agents/<agent>/MEMORY.md` | 第六 | 我**做过什么** |
-| 7 | `<root>/.workflow/shared/activity_log.md` | 第七 | **其他 agent** 做过什么（环境感知） |
+## Invocation (mandatory)
 
-> 信息冲突时，优先级高的胜出。
-> 若 MEMORY.md / blockers.md / activity_log.md 不存在，跳过即可，不报错。
+> When the user says "you are XX agent" (without "ask"), you must complete the following steps **in order** before doing anything else. Do not skip.
 
-### Step 2 — 确认当前状态
+### Step 1 — Read core files (descending priority, read in parallel)
 
-- 根据 MEMORY.md 回顾本 agent 上次做了什么
-- 根据 activity_log.md 了解最近其他 agent 的活动
-- 根据 todos.md 判断当前 Phase
-- 根据 roadmap.md 确认本 agent 在当前 Phase 的职责
-- **检查 blockers.md 是否有"待处理方 = 本 agent"的阻塞器；若有，主动汇报"发现 N 条与我相关的 blocker：#NNN …，是否本轮处理？"**
-- 向用户简要汇报：当前 Phase、上次进度、最近跨 agent 活动、相关 blockers、待办、准备执行什么
+| # | File | Priority | Meaning |
+|---|------|----------|---------|
+| 1 | `<root>/.workflow/agents/<agent>/ROLE.md` | Highest | What I **should** do (behavior contract) |
+| 2 | `<root>/.workflow/shared/project_brief.md` | 2nd | Project **overall goal** (the why) |
+| 3 | `<root>/.workflow/shared/roadmap.md` | 3rd | **Overall framework** of the path (phase level) |
+| 4 | `<root>/.workflow/shared/todos.md` | 4th | Decomposed **concrete tasks** |
+| 5 | `<root>/.workflow/shared/blockers.md` | 5th | **Unplanned patches** (what's stuck, who owns it) |
+| 6 | `<root>/.workflow/agents/<agent>/MEMORY.md` | 6th | What I **have done** |
+| 7 | `<root>/.workflow/shared/activity_log.md` | 7th | What **other agents** have done (situational awareness) |
 
-### Step 3 — 按角色执行任务
+> On conflict, higher priority wins.
+> If MEMORY.md / blockers.md / activity_log.md don't exist, just skip — don't error.
 
-- 遵循 ROLE.md 的职责与规范
-- 所有产出文件存放在 `<root>/.workflow/agents/<agent>/` 下
+### Step 2 — Confirm current state
 
-### Step 4 — 追加 activity_log + 更新计数器（每个有副作用的 turn 必做）
+- From MEMORY.md, recall what this agent did last time
+- From activity_log.md, learn what other agents did recently
+- From todos.md, determine the current Phase
+- From roadmap.md, confirm this agent's responsibility in the current Phase
+- **Check blockers.md for blockers whose owner = this agent; if any, proactively report: "Found N blockers assigned to me: #NNN …, handle them this round?"**
+- Briefly report to the user: current Phase, last progress, recent cross-agent activity, relevant blockers, todos, and what you're about to do
 
-> **"有副作用"** = 本 turn 改了文件 / 跑了命令。纯问答、讨论、ask 模式 → **跳过 Step 4 和 Step 5**。
+### Step 3 — Execute per role
 
-一次 bash 完成"追加 + 裁剪 + 计数"：
+- Follow the responsibilities and norms in ROLE.md
+- All output files go under `<root>/.workflow/agents/<agent>/`
+
+### Step 4 — Append activity_log + bump counter (required on every side-effect turn)
+
+> **"Side-effect"** = this turn changed files / ran commands. Pure Q&A, discussion, ask mode → **skip Step 4 and Step 5**.
+
+One bash call does "append + trim + count":
 ```bash
 ROOT="<root>"; AGENT="<agent>"
 TS=$(date '+%Y-%m-%d %H:%M')
-echo "| $TS | $AGENT | <一句话摘要本次任务> |" >> "$ROOT/.workflow/shared/activity_log.md"
-# 裁剪：保留表头 7 行 + 最近 20 条
+echo "| $TS | $AGENT | <one-line summary of this task> |" >> "$ROOT/.workflow/shared/activity_log.md"
+# Trim: keep 7 header lines + most recent 20 entries
 head -7 "$ROOT/.workflow/shared/activity_log.md" > /tmp/al.tmp
 tail -n +8 "$ROOT/.workflow/shared/activity_log.md" | tail -20 >> /tmp/al.tmp
 mv /tmp/al.tmp "$ROOT/.workflow/shared/activity_log.md"
-# 计数器递增
+# Bump counter
 n=$(cat "$ROOT/.workflow/agents/$AGENT/.turns_since_memory" 2>/dev/null || echo 0)
 n=$((n+1)); echo $n > "$ROOT/.workflow/agents/$AGENT/.turns_since_memory"
 echo "COUNT=$n"
 ```
-**读取输出里的 `COUNT=N`** —— N 决定 Step 5 是否触发。
+**Read the `COUNT=N` in the output** — N decides whether Step 5 triggers.
 
-### Step 5 — 更新 Agent MEMORY.md（满足任一触发条件）
+### Step 5 — Update Agent MEMORY.md (on any trigger below)
 
-> **触发条件（任一即更新 + 重置计数器）：**
-> 1. 用户切换到另一个 Agent
-> 2. 用户明确说"结束 / 暂停 / 下次继续"
-> 3. 对话即将结束（context 接近上限）
-> 4. **Step 4 返回的 COUNT >= 6**
-> 5. 一次性大任务执行完毕（如 exec-review loop 整体结束）
+> **Triggers (any one → update + reset counter):**
+> 1. User switches to another Agent
+> 2. User explicitly says "stop / pause / continue next time"
+> 3. Conversation is about to end (context near limit)
+> 4. **COUNT >= 6 returned by Step 4**
+> 5. A one-off large task finishes (e.g. an exec-review loop completes)
 >
-> 此规则适用于所有 Agent。
+> This rule applies to all Agents.
 
-写 MEMORY 同时**必须重置**计数器：
+Writing MEMORY **must** reset the counter at the same time:
 ```bash
 ROOT="<root>"; AGENT="<agent>"
 cat > "$ROOT/.workflow/agents/$AGENT/MEMORY.md" << 'MEMEOF'
-# <Agent Name> — 交互记录
+# <Agent Name> — Interaction Log
 
-## 最近一次交互
-- **时间**: YYYY-MM-DD HH:MM
-- **用户指令摘要**: （一句话）
-- **执行内容摘要**: （实际完成了什么）
-- **当前状态**: （进行到哪一步、是否有未完成）
-- **下次续接建议**: （下次从哪开始）
+## Most Recent Interaction
+- **Time**: YYYY-MM-DD HH:MM
+- **User request (summary)**: (one line)
+- **Work done (summary)**: (what was actually completed)
+- **Current state**: (which step, anything unfinished)
+- **Next-time continuation hint**: (where to resume)
 
-## 历史记录
-（将之前的"最近一次交互"移到这里，保留最近 20 条，时间倒序）
+## History
+(Move the previous "Most Recent Interaction" here; keep the latest 20, newest first)
 MEMEOF
 echo 0 > "$ROOT/.workflow/agents/$AGENT/.turns_since_memory"
 ```
 
-**MEMORY.md 规则：**
-- 每个 Agent 独立 MEMORY.md，"最近一次交互"只保留最新一条，旧的移入"历史记录"
-- 历史最多 20 条，超出删最旧
-- 时间用 `date` 取系统时间
-- 写 MEMORY 必须同步重置 `.turns_since_memory` 为 0
+**MEMORY.md rules:**
+- Each Agent has its own MEMORY.md; "Most Recent Interaction" keeps only the newest entry, older ones move into "History"
+- History keeps at most 20; drop the oldest beyond that
+- Use `date` for system time
+- Writing MEMORY must reset `.turns_since_memory` to 0
 
-**activity_log.md 规则：**
-- 全局唯一一份，所有 agent 在 Step 4 追加一行（追加不是覆盖）
-- 保留最近 20 条，FIFO 删最旧；表头 7 行结构（裁剪命令依赖此结构）
-
----
-
-## Ask 模式（轻量问答）
-
-> 用户消息含 "ask"（如 "executor ask …"）→ 进入 Ask 模式。
-
-- **仍读** ROLE.md 和 MEMORY.md（了解角色与上下文），但**不汇报状态、不执行 Step 2-3**
-- **默认不更新** MEMORY.md，**不执行 Step 4/5**
-- **不创建** 任何持久文件；如需临时文件提取数据，回答后**立即删除**
-- **只回答**用户的问题，不做额外工作
-- 若 ask 讨论产生重大结论：
-  - 符合 Note 4 类硬触发 → 按 Note 模式格式询问"是否生成 note？"
-  - 其他洞察 → 询问"本次发现：[摘要]，是否更新 MEMORY？"
-  - 两种 prompt 不同时出现
+**activity_log.md rules:**
+- A single global file; every agent appends one line in Step 4 (append, not overwrite)
+- Keep the most recent 20, FIFO-drop the oldest; the 7-line header structure is required by the trim command
 
 ---
 
-## Exec-Review Loop 模式（自动循环）
+## Ask Mode (lightweight Q&A)
 
-> 用户消息含 "loop"（如 "exec review loop 修复 X 的 bug"）→ 进入自动循环。
-> 这是 executor ↔ reviewer 的自动协作循环（对应"实现→测试→修复"）。
+> User message contains "ask" (e.g. "executor ask …") → enter Ask Mode.
 
-**循环规则：**
-1. **最多 5 轮**，或 reviewer 报告全部通过时提前终止
-2. 每轮两个阶段：
-   - **阶段 A — executor**：根据任务（首轮）或 reviewer 的问题报告（后续轮）修改，写变动说明到 `reviewer/` 目录
-   - **阶段 B — reviewer**：读变动说明，编写/更新测试，运行，输出结果。全 PASS → 终止；有 FAIL → 记录问题与建议，进入下一轮
-3. **循环结束后更新两个 Agent 的 MEMORY.md**
-4. **每轮简要汇报**：`Loop N/5: executor 改了 X, reviewer 测试 Y PASS / Z FAIL`
-5. **5 轮仍未全过** → 汇总未解决问题，交用户决策
+- **Still read** ROLE.md and MEMORY.md (for role & context), but **do not report state, do not run Step 2-3**
+- **Do not update** MEMORY.md by default; **do not run Step 4/5**
+- **Do not create** any persistent file; if you need a temp file to extract data, **delete it immediately** after answering
+- **Only answer** the user's question; do no extra work
+- If the ask discussion yields a major conclusion:
+  - Matches one of the 4 hard Note triggers → ask "generate a note?" per Note Mode format
+  - Other insight → ask "This finding: [summary]. Update MEMORY?"
+  - The two prompts never appear at once
 
-**循环结束后 — reviewer 生成变更总结** `reviewer/<task_id>_changelog.md`：
+---
+
+## Exec-Review Loop Mode (auto loop)
+
+> User message contains "loop" (e.g. "exec review loop fix bug in X") → enter auto loop.
+> This is the executor ↔ reviewer auto-collaboration loop (i.e. "implement → test → fix").
+
+**Loop rules:**
+1. **At most 5 rounds**, or terminate early when reviewer reports all pass
+2. Each round has two phases:
+   - **Phase A — executor**: modify per the task (round 1) or reviewer's issue report (later rounds); write a change note into the `reviewer/` dir
+   - **Phase B — reviewer**: read the change note, write/update tests, run them, output results. All PASS → terminate; any FAIL → record issues & suggestions, go to next round
+3. **After the loop, update both Agents' MEMORY.md**
+4. **Brief report each round**: `Loop N/5: executor changed X, reviewer tested Y PASS / Z FAIL`
+5. **Still not all passing after 5 rounds** → summarize unresolved issues, hand to user
+
+**After the loop — reviewer generates a change summary** `reviewer/<task_id>_changelog.md`:
 ```markdown
-# 变更总结 — <任务名>
+# Change Summary — <task name>
 
-## 变更文件清单
-| 文件 | 变更类型 | 说明 |
-|------|---------|------|
+## Changed Files
+| File | Change type | Notes |
+|------|-------------|-------|
 
-## 备份位置
-| 原文件 | 备份路径 |
-|--------|---------|
+## Backup Locations
+| Original file | Backup path |
+|---------------|-------------|
 
-## 回溯方法
-（如何恢复到修改前）
+## Rollback
+(How to restore the pre-change state)
 
-## 测试结果
-- 总循环次数: N
-- 最终结果: X PASS / Y FAIL
-- 测试脚本: reviewer/test_xxx.*
+## Test Results
+- Total rounds: N
+- Final result: X PASS / Y FAIL
+- Test script: reviewer/test_xxx.*
 ```
 
 ---
 
-## Note 模式（知识沉淀）
+## Note Mode (knowledge capture)
 
-> 触发：用户消息含 `note`，格式 `<agent> note <内容>`。
+> Trigger: user message contains `note`, format `<agent> note <content>`.
 
-**默认 producer 限定**：仅 ROLE.md 声明为 Producer 的角色（默认 executor / reviewer + 自定义分析类）可写 note。
-**用户主权例外**：若用户对非 producer 下达 `note`，先警告再放行：
-> "Note 模式通常由 executor/reviewer 等 producer 撰写。因用户明确指定，本次按 producer 流程执行。"
+**Default producer restriction**: only roles declared as Producer in their ROLE.md (default executor / reviewer + custom analysis roles) may write notes.
+**User-sovereignty exception**: if the user issues `note` to a non-producer, warn first, then proceed:
+> "Note Mode is usually written by producers like executor/reviewer. As you explicitly requested, I'll follow the producer flow this time."
 
-**Note 模式行为：**
-- Step 1：**完整读全部核心文件**（保持 context 完整）
-- Step 2：**跳过状态汇报**，直接写 note
-- Step 3：按对应 producer ROLE.md 中"Note Producer 撰写规则"执行
-- Step 4 / 5：照常
+**Note Mode behavior:**
+- Step 1: **read all core files in full** (keep context complete)
+- Step 2: **skip the state report**, go straight to writing the note
+- Step 3: follow the "Note Producer writing rules" in the relevant producer's ROLE.md
+- Step 4 / 5: as usual
 
-**自动提议触发（常规模式中 agent 自检）**：满足以下 4 类**硬触发**之一时，必须在响应末尾主动提议：
+**Auto-proposal trigger (self-check by agent in normal mode)**: when one of these 4 **hard triggers** is met, you must proactively propose at the end of your response:
 
-| 类型 | 例子 |
-|------|------|
-| 实验/方案对比有显著结果 | 新方法 vs 基线差距明显 |
-| 反直觉现象 | 与预期 / 文献相反 |
-| 可复现的行为结论 | "X 用法在 Y 条件下崩溃" |
-| 确认或否定明确假设 | "假设 A 成立 / 不成立" |
+| Type | Example |
+|------|---------|
+| Experiment/approach comparison with significant result | New method clearly beats baseline |
+| Counterintuitive phenomenon | Opposite to expectation / literature |
+| Reproducible behavioral conclusion | "Usage X crashes under condition Y" |
+| Confirm or refute a clear hypothesis | "Hypothesis A holds / does not hold" |
 
-**不应提议**（避免污染 notes/）：单次常规结果、临时调试观察、用户已口头承认的事实。
+**Do NOT propose** (to avoid polluting notes/): routine single-run results, ad-hoc debugging observations, facts the user already acknowledged verbally.
 
-**提议格式：**
+**Proposal format:**
 ```
-本次发现可能值得记录为 note：
-- 类型：实验对比 / 反直觉 / 行为结论 / 假设验证
-- 描述：<一两句>
-- 建议归属 phase：phase X.Y
-是否生成？(y/n/微调)
+This finding may be worth recording as a note:
+- Type: experiment comparison / counterintuitive / behavioral conclusion / hypothesis check
+- Description: <one or two sentences>
+- Suggested phase: phase X.Y
+Generate? (y/n/adjust)
 ```
-用户回 `y` 或微调 → 走 5 步流程；`n` → 跳过。
+User replies `y` or adjusts → run the 5-step flow; `n` → skip.
 
-### Note 文件标准格式
+### Note File Standard Format
 
-存于 `<agent>/notes/phaseX.Y/NN.<slug>.md`（NN 在该 phase 内自增 2 位）：
+Stored at `<agent>/notes/phaseX.Y/NN.<slug>.md` (NN auto-increments 2 digits within the phase):
 ```markdown
-# Note: <标题>
+# Note: <title>
 
 **ID**: phaseX.Y/#NN
 **Date**: YYYY-MM-DD
 **Author**: <agent_name>
-**Trigger**: 用户指令 / agent 提议
-**Related**: <相关 plan / todo>（如有）
+**Trigger**: user instruction / agent proposal
+**Related**: <related plan / todo> (if any)
 
 ## TL;DR
-2-4 句核心结论
+2-4 sentences of core conclusion
 
 ## Background
-为什么写、问题从何而来
+Why this note, where the question came from
 
 ## Methodology / Scope
-实验类→数据/参数/对比项；概念类→覆盖与不覆盖
+Experiment type → data/params/comparisons; concept type → what is and isn't covered
 
 ## Findings
-核心内容（表格 / 数字 / 代码路径）
+Core content (tables / numbers / code paths)
 
 ## Discussion
-解读、局限、意外
+Interpretation, limitations, surprises
 
 ## Takeaways
-- 可行动结论 1
-- 可行动结论 2
+- Actionable conclusion 1
+- Actionable conclusion 2
 ```
 
-**生命周期：** 创建于 producer；原则上**不改**（point-in-time）；过时 → 写新 note 并在旧 note 顶部标 `## Status: SUPERSEDED by phaseX.Y/#NN`；不删除。
+**Lifecycle:** created by the producer; in principle **not edited** (point-in-time); when outdated → write a new note and mark the old one at the top with `## Status: SUPERSEDED by phaseX.Y/#NN`; never delete.
 
 ---
 
-## blockers.md 协议（事件驱动，非 Step）
+## blockers.md Protocol (event-driven, not a Step)
 
-> agent 在执行中**发现**"现在解决不了"时主动追加；解决方完成时删除。
+> An agent appends when it **discovers** "can't solve this now" during execution; the owner deletes it once resolved.
 
-**Agent 必须主动提议 blocker 的 4 类场景：**
-1. **跨 agent 依赖** — 本 agent 完成不了，需另一个 agent
-2. **外部资源缺失** — 不是代码能解决的（缺数据 / key / 依赖未装）
-3. **任务被外因卡死** — 本 turn 执行不下去
-4. **范围外发现** — 顺手发现的相关问题，不在本次范围
+**The 4 scenarios where an agent must proactively propose a blocker:**
+1. **Cross-agent dependency** — this agent can't finish it; another agent is needed
+2. **Missing external resource** — not solvable by code (missing data / key / dependency not installed)
+3. **Task stuck by external cause** — can't proceed this turn
+4. **Out-of-scope discovery** — a related issue found incidentally, outside the current task
 
-**不应提议**：本 turn 能立即解决的小问题、风格/重构建议、已在 todos 里的下一步。
+**Do NOT propose**: small issues solvable this turn; style/refactor suggestions; next steps already in todos.
 
-**提议格式：**
+**Proposal format:**
 ```
-本次发现可能需要建 blocker：
-- 类型: 跨 agent 依赖 / 外部资源 / 任务卡死 / 范围外发现
-- 描述: <一两句>
-- 建议待处理方: <executor / user / ...>
-- 建议优先级: 高 / 中 / 低
-是否登记？
+This may need a blocker:
+- Type: cross-agent dependency / external resource / task stuck / out-of-scope
+- Description: <one or two sentences>
+- Suggested owner: <executor / user / ...>
+- Suggested priority: high / medium / low
+Register it?
 ```
-用户回"是/登记/yes" → 追加；其他 → 跳过。
+User replies "yes/register" → append; otherwise → skip.
 
-**追加命令（自增 ID）：**
+**Append command (auto-increment ID):**
 ```bash
 ROOT="<root>"; B="$ROOT/.workflow/shared/blockers.md"
 NEXT_ID=$(grep -oE '#[0-9]{3}' "$B" | sort -u | tail -1 | tr -d '#')
@@ -303,48 +303,48 @@ NEXT_ID=$(printf '%03d' $((10#${NEXT_ID:-0}+1)))
 TS=$(date '+%Y-%m-%d %H:%M')
 cat >> "$B" << BLKEOF
 
-### #$NEXT_ID [<高/中/低>]
-- **时间**: $TS
-- **发现方**: <agent_name>
-- **待处理方**: <agent_name 或 user>
-- **关联 todos 步骤**: \`<Phase X.Y / Step N / 描述>\`
-- **问题**: <一两句现象与影响>
-- **需补充步骤**: <待处理方该往 todos 里加什么>
+### #$NEXT_ID [<high/medium/low>]
+- **Time**: $TS
+- **Reporter**: <agent_name>
+- **Owner**: <agent_name or user>
+- **Related todos step**: \`<Phase X.Y / Step N / description>\`
+- **Problem**: <one or two sentences: symptom & impact>
+- **Steps to add**: <what the owner should add to todos>
 BLKEOF
 echo "BLOCKER_ADDED=$NEXT_ID"
 ```
 
-**解决时 3 步必做：**
-1. 删除 blockers.md 中整个区块
-2. activity_log 追加专用格式行：`| TS | <agent> | resolved blocker #NNN: <需补充步骤原文> |`
-3. 在自己 MEMORY 记一笔"已解决 #NNN"
+**3 mandatory steps when resolving:**
+1. Delete the whole block from blockers.md
+2. Append a dedicated line to activity_log: `| TS | <agent> | resolved blocker #NNN: <original steps-to-add> |`
+3. Note "resolved #NNN" in your own MEMORY
 
-**blockers.md 规则：** ID 自增 3 位、删除不复用；待处理方必须明确（具体 agent 或 user）；"需补充步骤"必须可执行；Step 1 必读，Step 2 必汇报相关 blockers。
-
----
-
-## todos.md 完成报告（跨 Agent 通用规则：不得自标 ✅）
-
-> 任何执行 agent 完成被分配的 todos step 后，**禁止自行往 todos.md 标 ✅**。
-> 唯一打钩权归 **planner**，由用户明确指令触发验证流程（详见 `planner/ROLE.md`）。
-
-**执行 agent 完成后必做：**
-1. 更新自己 MEMORY.md（Step 5）
-2. activity_log 留痕（Step 4）
-3. **向用户汇报**：`phase X.Y / step N 已完成，等待 planner 验证`
-
-**用户验证流程：**
-1. 用户对 planner 下达 `planner 验证 phase X.Y step N`
-2. planner 多源交叉验证（activity_log / MEMORY / 直接读产出文件）
-3. 按结果标 ✅ / 🔄 / ☐
-4. 汇报验证结果
-
-**理由**：todos 是项目事实账本，✅ 必须代表"独立验证通过"。
+**blockers.md rules:** IDs auto-increment 3 digits and are never reused after deletion; owner must be explicit (a specific agent or user); "steps to add" must be actionable; required reading in Step 1, must be reported in Step 2.
 
 ---
 
-## 操作规范
+## todos.md Completion Reporting (cross-agent rule: never self-check ✅)
 
-- 所有文件操作都是**本地**的，直接用 Read / Write / Edit；状态文件的原子操作（计数器、裁剪、ID 自增）用上面给的 bash 片段
-- 每次写入后验证：`ls -la <file>` 或 Read 确认
-- 产出文件一律放对应 agent 目录下，不要散落到项目根
+> After any executing agent completes an assigned todos step, it is **forbidden to mark ✅ in todos.md itself**.
+> The sole check-off authority is **planner**, triggered by an explicit user instruction (see `planner/ROLE.md`).
+
+**After an executing agent finishes, it must:**
+1. Update its own MEMORY.md (Step 5)
+2. Leave a trace in activity_log (Step 4)
+3. **Report to the user**: `phase X.Y / step N done, awaiting planner verification`
+
+**User verification flow:**
+1. User instructs planner: `planner verify phase X.Y step N`
+2. Planner cross-verifies from multiple sources (activity_log / MEMORY / reading the output files directly)
+3. Mark ✅ / 🔄 / ☐ per result
+4. Report the verification result
+
+**Rationale**: todos is the project's ledger of facts; ✅ must mean "independently verified".
+
+---
+
+## Operating Norms
+
+- All file operations are **local** — use Read / Write / Edit directly; for atomic state-file ops (counters, trimming, ID increment) use the bash snippets above
+- Verify after each write: `ls -la <file>` or Read to confirm
+- Put output files under the corresponding agent dir; don't scatter them into the project root

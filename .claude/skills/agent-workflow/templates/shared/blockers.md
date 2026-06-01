@@ -1,17 +1,17 @@
-# 阻塞器清单 (blockers.md)
+# Blocker List (blockers.md)
 
-> 事件驱动：agent 发现"现在解决不了"时追加；解决方完成时删除。
-> Step 1 第五优先级读取；Step 2 中本 agent 必须汇报"待处理方=自己"的 blocker。
-> ID 自增 3 位，删除后不复用。
+> Event-driven: an agent appends when it discovers "can't solve this now"; the owner deletes it once resolved.
+> Fifth-priority read in Step 1; in Step 2 this agent must report blockers whose owner = itself.
+> IDs auto-increment 3 digits and are never reused after deletion.
 
-<!-- 下方为示例区块格式，实际无 blocker 时此文件除本说明外为空 -->
+<!-- The block below is the example format; when there are no blockers this file is empty except for this note -->
 
 <!--
-### #001 [高]
-- **时间**: 2026-01-01 12:00
-- **发现方**: reviewer
-- **待处理方**: executor
-- **关联 todos 步骤**: `phase 1 / step 2 / 测试登录模块`
-- **问题**: 登录接口在并发下偶发 500，疑似 executor 实现的连接池未加锁
-- **需补充步骤**: executor 给连接池加锁并补回归测试
+### #001 [high]
+- **Time**: 2026-01-01 12:00
+- **Reporter**: reviewer
+- **Owner**: executor
+- **Related todos step**: `phase 1 / step 2 / test login module`
+- **Problem**: Login endpoint intermittently 500s under concurrency; suspected unlocked connection pool in executor's implementation
+- **Steps to add**: executor adds locking to the connection pool and a regression test
 -->

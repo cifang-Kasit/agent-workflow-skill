@@ -1,7 +1,7 @@
-# 全局活动日志 (activity_log.md)
+# Global Activity Log (activity_log.md)
 
-> 所有 agent 在 Step 4 各自追加一行（追加不是覆盖）。Step 1 第七优先级读取。
-> 保留最近 20 条，FIFO 删最旧。表头固定 7 行，裁剪命令依赖此结构，勿改前 7 行。
+> Every agent appends one line in Step 4 (append, not overwrite). Seventh-priority read in Step 1.
+> Keep the most recent 20, FIFO-drop the oldest. Header is fixed at 7 lines; the trim command depends on it, do not change the first 7 lines.
 
-| 时间 | Agent | 摘要 |
-|------|-------|------|
+| Time | Agent | Summary |
+|------|-------|---------|

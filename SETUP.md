@@ -1,51 +1,51 @@
-# 环境搭建指南（Windows 从零开始）
+# Environment Setup Guide (Windows, from scratch)
 
-> 在一台新的 **Windows 11** 电脑上，从零搭好这套终端工作流环境：
-> **Starship（提示符）+ WSL/Ubuntu + Zellij（多窗格）+ Claude Code + agent-workflow Skill**。
-> 估计耗时：30~60 分钟（取决于网速）。全程纯本地，**不需要任何 SSH / 远程服务器**。
+> On a fresh **Windows 11** machine, set up this terminal workflow environment from scratch:
+> **Starship (prompt) + WSL/Ubuntu + Zellij (multi-pane) + Claude Code + the agent-workflow Skill**.
+> Estimated time: 30–60 minutes (depends on network). Fully local — **no SSH / remote server needed**.
 
-> 本指南配套文件都在本交付包里（`dotfiles/`、`.claude/skills/agent-workflow/`），不依赖任何云盘账号。
-
----
-
-## 你将得到什么
-
-- 漂亮的 **Pastel Powerline** 终端提示符（Starship + Nerd Font 图标）
-- **WSL/Ubuntu** Linux 环境跑 Claude Code
-- **Zellij** 一键多窗格布局（一个会话里同时开多个面板）
-- **Claude Code** + 预装好的 **多 Agent 工作流 Skill**
+> All companion files are in this package (`dotfiles/`, `.claude/skills/agent-workflow/`) — no cloud account dependency.
 
 ---
 
-## 阶段 1 — 装 Windows 端工具（15 分钟）
+## What you'll get
 
-> 全部用 **PowerShell**（普通权限即可，除非特别说明）。
+- A nice **Pastel Powerline** terminal prompt (Starship + Nerd Font icons)
+- A **WSL/Ubuntu** Linux environment to run Claude Code
+- **Zellij** one-shot multi-pane layout (several panes in one session)
+- **Claude Code** + the pre-installed **multi-agent workflow Skill**
 
-### 1.1 检查 winget
+---
+
+## Stage 1 — Install Windows-side tools (15 min)
+
+> All in **PowerShell** (normal privileges, unless noted).
+
+### 1.1 Check winget
 
 ```powershell
 winget --version
 ```
-Win 11 自带。没有就去 Microsoft Store 装 "App Installer"。
+Built into Win 11. If missing, install "App Installer" from the Microsoft Store.
 
-### 1.2 安装 Starship
+### 1.2 Install Starship
 
 ```powershell
 winget install --id Starship.Starship -e --accept-source-agreements --accept-package-agreements
 ```
 
-### 1.3 安装 JetBrainsMono Nerd Font
+### 1.3 Install JetBrainsMono Nerd Font
 
 ```powershell
 winget install --id DEVCOM.JetBrainsMonoNerdFont -e --accept-source-agreements --accept-package-agreements
 ```
 
-### 1.4 让 Windows Terminal 用这个字体
+### 1.4 Make Windows Terminal use that font
 
-打开 Windows Terminal → `Ctrl + ,` → 选 PowerShell 配置文件 → **外观 → 字体** → 选 `JetBrainsMono Nerd Font` → 保存。
-（不设字体的话，提示符里的图标会变成方块/乱码。）
+Open Windows Terminal → `Ctrl + ,` → select the PowerShell profile → **Appearance → Font face** → choose `JetBrainsMono Nerd Font` → save.
+(Without this font, the prompt icons show as boxes / garbled.)
 
-### 1.5 配置 PowerShell profile
+### 1.5 Configure the PowerShell profile
 
 ```powershell
 New-Item -ItemType File -Path $PROFILE -Force | Out-Null
@@ -55,19 +55,19 @@ Import-Module Terminal-Icons
 "@
 ```
 
-### 1.6 放置 Starship 配置（用本交付包里的 `dotfiles/starship.toml`）
+### 1.6 Place the Starship config (use `dotfiles/starship.toml` from this package)
 
 ```powershell
-# 把 <交付包路径> 换成你解压本交付包的位置
+# Replace <package-path> with where you unpacked this package
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.config" -Force | Out-Null
-Copy-Item "<交付包路径>\dotfiles\starship.toml" "$env:USERPROFILE\.config\starship.toml"
+Copy-Item "<package-path>\dotfiles\starship.toml" "$env:USERPROFILE\.config\starship.toml"
 ```
-或者不用本包配置、直接生成官方预设：
+Or skip the bundled config and generate the official preset:
 ```powershell
 starship preset pastel-powerline -o "$env:USERPROFILE\.config\starship.toml"
 ```
 
-### 1.7 安装 Terminal-Icons 模块
+### 1.7 Install the Terminal-Icons module
 
 ```powershell
 Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser
@@ -75,38 +75,38 @@ Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
 Install-Module -Name Terminal-Icons -Repository PSGallery -Scope CurrentUser -Force
 ```
 
-### 1.8 重启 PowerShell 验证
+### 1.8 Restart PowerShell to verify
 
-关掉所有 PowerShell 窗口，开新窗口。应看到 Pastel Powerline 提示符，`ls` 时文件名前有彩色图标。
+Close all PowerShell windows and open a new one. You should see the Pastel Powerline prompt, and colorful icons before filenames on `ls`.
 
 ---
 
-## 阶段 2 — 装 WSL + Ubuntu（10~30 分钟，看网速）
+## Stage 2 — Install WSL + Ubuntu (10–30 min, network-dependent)
 
-### 2.1 以**管理员身份**打开 PowerShell
-`Win + X` → "终端（管理员）"。
+### 2.1 Open PowerShell **as Administrator**
+`Win + X` → "Terminal (Admin)".
 
-### 2.2 安装 WSL + Ubuntu 24.04 LTS
+### 2.2 Install WSL + Ubuntu 24.04 LTS
 ```powershell
 wsl --install -d Ubuntu-24.04 --web-download
 ```
-> 卡 0% 时：`Ctrl+C` → `wsl --update --web-download` → 重试。
+> If it hangs at 0%: `Ctrl+C` → `wsl --update --web-download` → retry.
 
-### 2.3 设置 UNIX 用户名 / 密码
-装完会弹 Ubuntu 窗口要求设置用户名密码。记住密码（后面 `sudo` 要用）。
+### 2.3 Set the UNIX username / password
+After install, an Ubuntu window pops up to set a username and password. Remember the password (needed for `sudo`).
 
-### 2.4 验证
+### 2.4 Verify
 ```bash
 whoami && pwd && cat /etc/os-release | head -2
 ```
 
 ---
 
-## 阶段 3 — 配置 WSL 内部环境（10 分钟）
+## Stage 3 — Configure the WSL internal environment (10 min)
 
-> 在 **Ubuntu 窗口里**操作。
+> Work inside the **Ubuntu window**.
 
-### 3.1 安装 nvm + Node.js LTS
+### 3.1 Install nvm + Node.js LTS
 ```bash
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
 export NVM_DIR="$HOME/.nvm"
@@ -115,14 +115,14 @@ nvm install --lts && nvm use --lts && nvm alias default 'lts/*'
 node --version && npm --version
 ```
 
-### 3.2 安装 Claude Code
+### 3.2 Install Claude Code
 ```bash
 npm install -g @anthropic-ai/claude-code
 claude --version
 ```
-首次运行 `claude` 需要**登录 Anthropic 账号**（浏览器授权）。
+The first `claude` run requires **logging into your Anthropic account** (browser authorization).
 
-### 3.3 安装 Zellij
+### 3.3 Install Zellij
 ```bash
 sudo snap install zellij --classic
 echo 'export PATH="$PATH:/snap/bin"' >> ~/.bashrc
@@ -130,88 +130,88 @@ exec bash -l
 zellij --version
 ```
 
-### 3.4 放置 Zellij 配置（用本交付包里的 `dotfiles/zellij/`）
+### 3.4 Place the Zellij config (use `dotfiles/zellij/` from this package)
 
-WSL 里访问 Windows 文件是 `/mnt/c/...`。把 `<交付包路径>` 换成本包在 Windows 下的路径（如 `/mnt/c/Users/<你的用户名>/Desktop/agent-workflow-skill`）：
+In WSL, Windows files are at `/mnt/c/...`. Replace `<package-path>` with this package's path under Windows (e.g. `/mnt/c/Users/<your-username>/Desktop/agent-workflow-skill`):
 ```bash
 mkdir -p ~/.config/zellij/layouts
-cp "<交付包路径>/dotfiles/zellij/config.kdl" ~/.config/zellij/
-cp "<交付包路径>/dotfiles/zellij/layouts/my0.kdl" ~/.config/zellij/layouts/
+cp "<package-path>/dotfiles/zellij/config.kdl" ~/.config/zellij/
+cp "<package-path>/dotfiles/zellij/layouts/my0.kdl" ~/.config/zellij/layouts/
 ```
 
-### 3.5 配置 bashrc 快捷别名
+### 3.5 Configure bashrc aliases
 ```bash
 cat >> ~/.bashrc << 'EOF'
 
 # === workflow shortcuts ===
-# 把 <项目路径> 换成你的实际项目目录
-alias new='cd <项目路径> && zellij -s work -n my0'
-alias old='cd <项目路径> && zellij attach work'
+# Replace <project-path> with your actual project directory
+alias new='cd <project-path> && zellij -s work -n my0'
+alias old='cd <project-path> && zellij attach work'
 EOF
 source ~/.bashrc
 ```
 
 ---
 
-## 阶段 4 — 安装多 Agent 工作流 Skill（5 分钟）
+## Stage 4 — Install the multi-agent workflow Skill (5 min)
 
-> 这是本交付包的核心功能。详见 `README.md`。
+> This is the core feature of this package. See `README.md` for details.
 
-1. 把本交付包里的 `.claude/skills/agent-workflow/` 整个文件夹，复制到你的**目标项目根目录**下：
+1. Copy the `.claude/skills/agent-workflow/` folder from this package into your **target project root**:
    ```bash
-   mkdir -p <项目路径>/.claude/skills
-   cp -r "<交付包路径>/.claude/skills/agent-workflow" <项目路径>/.claude/skills/
+   mkdir -p <project-path>/.claude/skills
+   cp -r "<package-path>/.claude/skills/agent-workflow" <project-path>/.claude/skills/
    ```
-2. 在该项目里启动 Claude Code：
+2. Start Claude Code in that project:
    ```bash
-   cd <项目路径> && claude
+   cd <project-path> && claude
    ```
-3. 在 Claude Code 里运行：
+3. In Claude Code, run:
    ```
    /agent-workflow init
    ```
-   它会自动搭好 `.workflow/` 状态目录、安装工作流协议、让你填项目目标。
+   It scaffolds the `.workflow/` state dir, installs the workflow protocol, and asks for your project goal.
 
-之后每条消息以 "你是 executor / planner / …" 开头即可触发工作流。完整用法见 `README.md`。
+After that, start each message with "you are executor / planner / …" to trigger the workflow. Full usage in `README.md`.
 
 ---
 
-## 阶段 5 — 验收清单
+## Stage 5 — Acceptance Checklist
 
-PowerShell：
-- [ ] `starship --version` 有版本号
-- [ ] `ls` 有彩色文件图标
-- [ ] 提示符是 Pastel Powerline 样式
+PowerShell:
+- [ ] `starship --version` shows a version
+- [ ] `ls` shows colorful file icons
+- [ ] The prompt is in Pastel Powerline style
 
-Ubuntu：
+Ubuntu:
 - [ ] `node --version` >= 18
-- [ ] `claude --version` 有版本号
-- [ ] `zellij --version` 有版本号
-- [ ] `new` 能启动 Zellij 3-pane 布局
-- [ ] Zellij 里跑 `claude` 能进入交互界面（首次需登录）
-- [ ] `/agent-workflow init` 成功搭出 `.workflow/`
+- [ ] `claude --version` shows a version
+- [ ] `zellij --version` shows a version
+- [ ] `new` starts Zellij with a 3-pane layout
+- [ ] Running `claude` inside Zellij opens the interactive UI (login on first run)
+- [ ] `/agent-workflow init` successfully scaffolds `.workflow/`
 
-全部 ✅ → 搭建完成 🎉
+All ✅ → setup complete 🎉
 
 ---
 
-## 附录：常见问题
+## Appendix: FAQ
 
-**Q1: `new` 报 "There is no active session!"**
-→ alias 必须用 `-n my0`，不要用 `-l my0`。见 3.5。
+**Q1: `new` reports "There is no active session!"**
+→ The alias must use `-n my0`, not `-l my0`. See 3.5.
 
-**Q2: WSL 里 `claude` 命令找不到**
-→ nvm 装的全局包需重启 shell：`exec bash -l` 或新开 Ubuntu 窗口。
+**Q2: `claude` command not found in WSL**
+→ nvm's global packages need a shell restart: `exec bash -l` or open a new Ubuntu window.
 
-**Q3: Zellij 启动后所有 pane 卡在 `/mnt/c/...`**
-→ 布局里有硬编码 cwd，删掉：
+**Q3: After Zellij starts, all panes are stuck in `/mnt/c/...`**
+→ A hardcoded cwd in the layout; remove it:
 ```bash
 sed -i '/cwd[ =]/d' ~/.config/zellij/layouts/my0.kdl
 ```
-（本包自带的 `my0.kdl` 已无此问题，无需处理。）
+(The `my0.kdl` bundled here already has no such issue — no action needed.)
 
-**Q4: 提示符图标是方块/乱码**
-→ Windows Terminal 没设 Nerd Font，回到 1.4。
+**Q4: Prompt icons are boxes / garbled**
+→ Windows Terminal isn't using a Nerd Font; go back to 1.4.
 
-**Q5: PowerShell profile 不生效**
-→ 确认 `Get-Content $PROFILE` 内容正确，重开窗口。
+**Q5: PowerShell profile has no effect**
+→ Confirm `Get-Content $PROFILE` has the right content, then reopen the window.
